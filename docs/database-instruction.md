@@ -4,7 +4,7 @@ PostgreSQL is the only database this project needs right now. The goal here is t
 
 ---
 
-## Phase 1 — Create the database
+## Phase 1 — Create the database ✓
 
 Nothing fancy here. Just create a dedicated database for the project.
 
@@ -18,7 +18,7 @@ Confirm you can connect to it before moving on.
 
 ---
 
-## Phase 2 — Design the main table
+## Phase 2 — Design the main table ✓
 
 The MVP needs one table: `flight_watches`.
 
@@ -48,7 +48,7 @@ A few things worth noting about this design:
 
 ---
 
-## Phase 3 — Add constraints
+## Phase 3 — Add constraints ✓
 
 These protect the data from obviously wrong values.
 
@@ -62,7 +62,7 @@ The third constraint is the most important one — it prevents a return date tha
 
 ---
 
-## Phase 4 — The full CREATE TABLE script
+## Phase 4 — The full CREATE TABLE script ✓
 
 Save this as `backend/sql/001_create_flight_watches.sql`.
 
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS flight_watches (
 
 ---
 
-## Phase 5 — Seed data for development
+## Phase 5 — Seed data for development ✓
 
 Having a few rows in the database from the start makes it much easier to test the API and the frontend.
 

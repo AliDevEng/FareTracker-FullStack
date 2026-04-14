@@ -63,21 +63,21 @@ FareTracker-FullStack/
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py
-│   │   ├── config.py            ✓ done
-│   │   ├── database.py          (next)
-│   │   ├── dependencies.py      (next)
-│   │   ├── models.py
-│   │   ├── schemas.py
-│   │   ├── main.py
+│   │   ├── config.py            ✓ env config
+│   │   ├── database.py          ✓ engine and session
+│   │   ├── dependencies.py      ✓ get_db
+│   │   ├── models.py            ✓ FlightWatch ORM model
+│   │   ├── schemas.py           ✓ create / update / response
+│   │   ├── main.py              ✓ app entry point, /docs live
 │   │   ├── routes/
-│   │   │   └── watches.py
+│   │   │   └── watches.py       ← CRUD endpoints (in progress)
 │   │   └── services/
 │   ├── sql/
-│   │   ├── 001_create_flight_watches.sql  ✓ done
-│   │   └── 002_seed_flight_watches.sql    ✓ done
+│   │   ├── 001_create_flight_watches.sql  ✓
+│   │   └── 002_seed_flight_watches.sql    ✓
 │   ├── tests/
-│   ├── requirements.txt         ✓ done
-│   └── .env.example             ✓ done
+│   ├── requirements.txt         ✓
+│   └── .env.example             ✓
 ├── frontend/                    (not started)
 └── docs/
     ├── backend-instruction.md
@@ -137,8 +137,8 @@ The project is built in phases rather than all at once. Each phase produces some
 |---|---|---|
 | 1 | Repo structure | Done |
 | 2 | Database design and setup | Done |
-| 3 | Backend config and DB connection | In progress |
-| 4 | CRUD endpoints | Pending |
+| 3 | Backend config and DB connection | Done |
+| 4 | CRUD endpoints | In progress |
 | 5 | Manual API testing | Pending |
 | 6 | Frontend scaffold | Pending |
 | 7 | UI for create and list | Pending |

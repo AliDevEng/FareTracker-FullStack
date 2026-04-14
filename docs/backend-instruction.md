@@ -35,7 +35,7 @@ You don't need all of this on day one. Start simple and grow into it.
 
 ---
 
-## Phase 1 — Set up the workspace
+## Phase 1 — Set up the workspace ✓
 
 Create the `backend/` folder and get the Python environment ready.
 
@@ -65,7 +65,7 @@ __pycache__/
 
 ---
 
-## Phase 2 — Install dependencies
+## Phase 2 — Install dependencies ✓
 
 Create `requirements.txt`:
 
@@ -88,7 +88,7 @@ pip install -r requirements.txt
 
 ---
 
-## Phase 3 — Environment configuration
+## Phase 3 — Environment configuration ✓
 
 Create `.env`:
 
@@ -122,7 +122,7 @@ Note: `pydantic-settings` is a separate package from Pydantic v2 — add it to `
 
 ---
 
-## Phase 4 — Database connection layer
+## Phase 4 — Database connection layer ✓
 
 Create `app/database.py`:
 
@@ -157,7 +157,7 @@ This dependency is injected into route functions. The session opens, the route r
 
 ---
 
-## Phase 5 — The ORM model
+## Phase 5 — The ORM model ✓
 
 Create `app/models.py`:
 
@@ -188,7 +188,7 @@ This mirrors the `flight_watches` table from `database-instruction.md`. Column n
 
 ---
 
-## Phase 6 — Pydantic schemas
+## Phase 6 — Pydantic schemas ✓
 
 Three schemas cover the main cases: creating a watch, updating one, and returning one in a response.
 
@@ -251,7 +251,7 @@ class FlightWatchResponse(BaseModel):
 
 ---
 
-## Phase 7 — App entry point
+## Phase 7 — App entry point ✓
 
 Create `app/main.py`:
 
