@@ -93,13 +93,13 @@ pip install -r requirements.txt
 Create `.env`:
 
 ```env
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/flight_tracker
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/fare_tracker
 ```
 
 Create `.env.example` (safe to commit — no real credentials):
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/flight_tracker
+DATABASE_URL=postgresql://user:password@localhost:5432/fare_tracker
 ```
 
 Create `app/config.py`:

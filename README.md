@@ -115,9 +115,9 @@ The API will be at `http://localhost:8000` and the auto-generated docs at `http:
 ### Database setup
 
 ```bash
-psql -U postgres -c "CREATE DATABASE flight_tracker;"
-psql -U postgres -d flight_tracker -f backend/sql/001_create_flight_watches.sql
-psql -U postgres -d flight_tracker -f backend/sql/002_seed_flight_watches.sql
+psql -U postgres -c "CREATE DATABASE fare_tracker;"
+psql -U postgres -d fare_tracker -f backend/sql/001_create_flight_watches.sql
+psql -U postgres -d fare_tracker -f backend/sql/002_seed_flight_watches.sql
 ```
 
 ### Frontend setup

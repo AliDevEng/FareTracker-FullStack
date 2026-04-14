@@ -10,7 +10,7 @@ Nothing fancy here. Just create a dedicated database for the project.
 
 ```bash
 psql -U postgres
-CREATE DATABASE flight_tracker;
+CREATE DATABASE fare_tracker;
 \q
 ```
 
@@ -192,7 +192,7 @@ Then each schema change becomes a versioned migration file instead of a manual s
 
 ## Done when
 
-- `flight_tracker` database exists
+- `fare_tracker` database exists
 - `flight_watches` table is created with all constraints
 - seed data inserts without errors
 - the backend can connect to the database and read/write records
