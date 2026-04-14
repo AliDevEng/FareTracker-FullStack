@@ -58,31 +58,27 @@ Coming later:
 ```
 FareTracker-FullStack/
 ├── README.md
+├── .gitignore
+├── .gitattributes
 ├── backend/
 │   ├── app/
-│   │   ├── main.py
-│   │   ├── database.py
+│   │   ├── __init__.py
+│   │   ├── config.py            ✓ done
+│   │   ├── database.py          (next)
+│   │   ├── dependencies.py      (next)
 │   │   ├── models.py
 │   │   ├── schemas.py
-│   │   ├── config.py
-│   │   ├── dependencies.py
-│   │   └── routes/
-│   │       └── watches.py
+│   │   ├── main.py
+│   │   ├── routes/
+│   │   │   └── watches.py
+│   │   └── services/
 │   ├── sql/
-│   │   ├── 001_create_flight_watches.sql
-│   │   └── 002_seed_flight_watches.sql
+│   │   ├── 001_create_flight_watches.sql  ✓ done
+│   │   └── 002_seed_flight_watches.sql    ✓ done
 │   ├── tests/
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── types/
-│   │   └── App.tsx
-│   ├── package.json
-│   └── .env.example
+│   ├── requirements.txt         ✓ done
+│   └── .env.example             ✓ done
+├── frontend/                    (not started)
 └── docs/
     ├── backend-instruction.md
     ├── frontend-instruction.md
@@ -140,8 +136,8 @@ The project is built in phases rather than all at once. Each phase produces some
 | Phase | Focus | Status |
 |---|---|---|
 | 1 | Repo structure | Done |
-| 2 | Database design | Done |
-| 3 | Backend config and DB connection | Pending |
+| 2 | Database design and setup | Done |
+| 3 | Backend config and DB connection | In progress |
 | 4 | CRUD endpoints | Pending |
 | 5 | Manual API testing | Pending |
 | 6 | Frontend scaffold | Pending |
