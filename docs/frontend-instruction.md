@@ -1,32 +1,18 @@
-# Frontend Instruction
+# Frontend — Build Guide
 
-This document explains how to build the frontend in phases. The frontend should stay focused on user interaction, page state, and calling the backend API.
+The frontend is a React + TypeScript app built with Vite. Its job is to let the user manage flight watches through a UI that talks to the FastAPI backend.
 
-Do not put business rules that belong in the backend into the frontend.
-
----
-
-## Frontend Goal
-
-Build a small frontend that can:
-
-- create a flight watch
-- display saved watches
-- edit a watch
-- delete a watch
-- communicate with the backend cleanly
-
-The first version should be minimal and functional. Styling can stay simple.
+Build this after the backend CRUD is working. The frontend should not contain validation logic that belongs in the API, and it should not make assumptions about database structure.
 
 ---
 
-## Recommended Frontend Folder Structure
+## Target folder structure
 
-```text
+```
 frontend/
 ├── src/
 │   ├── api/
-│   │   └── watches.ts
+│   │   └── watches.ts       ← all backend API calls live here
 │   ├── components/
 │   │   ├── FlightWatchForm.tsx
 │   │   ├── FlightWatchList.tsx
@@ -34,253 +20,319 @@ frontend/
 │   ├── pages/
 │   │   └── HomePage.tsx
 │   ├── types/
-│   │   └── flight-watch.ts
+│   │   └── flight-watch.ts  ← shared TypeScript types
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── styles/
 ├── public/
-├── package.json
-└── .env
+├── .env
+├── .env.example
+└── package.json
 ```
 
-This does not need to be perfect on day one, but it should move in this direction.
+---
+
+## Phase 1 — Scaffold the app
+
+```bash
+npm create vite@latest frontend -- --template react-ts
+cd frontend
+npm install
+npm run dev
+```
+
+Confirm the default Vite page loads at `http://localhost:5173` before touching anything else.
+
+Add a `.env` file:
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+And `.env.example`:
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+**Checkpoint:** dev server starts and the default page is visible.
 
 ---
 
-## Phase 1 — Create the Frontend App
+## Phase 2 — Clean the starter project
 
-### What to do
-- Create the `frontend` folder
-- Initialize a React project with TypeScript
-- Prefer Vite for a lightweight setup
-- Confirm that the app starts locally
+The default Vite template includes boilerplate that gets in the way. Strip it down:
 
-### Checkpoint
-- the dev server runs
-- the default page opens in the browser
+- delete the default CSS content or replace with a minimal reset
+- remove the counter demo from `App.tsx`
+- keep `main.tsx` as-is (it just mounts the app)
+- keep the folder structure clean and intentional from the start
 
----
+```tsx
+// App.tsx after cleanup
+function App() {
+  return (
+    <div>
+      <h1>FareTracker</h1>
+    </div>
+  )
+}
 
-## Phase 2 — Clean the Starter Project
+export default App
+```
 
-### What to do
-Remove unnecessary starter code so the project becomes easier to understand.
-
-### Keep only what you need
-- root app
-- one page
-- one styles entry
-- clear folder naming
-
-### Checkpoint
-- the app still runs
-- the folder structure looks intentional
+**Checkpoint:** the app still runs with no console errors and the cleaned-up page is visible.
 
 ---
 
-## Phase 3 — Define Frontend Types
+## Phase 3 — Define TypeScript types
 
-### What to do
-Create a shared type or interface for the flight watch object that matches backend responses.
+Create `src/types/flight-watch.ts`. This type should match what the backend returns.
 
-### Include MVP fields
-- id
-- origin
-- destination
-- departure_date
-- return_date
-- is_round_trip
-- target_price
-- current_price
-- currency
-- is_active
-- created_at
-- updated_at
+```typescript
+export interface FlightWatch {
+  id: number
+  origin: string
+  destination: string
+  departure_date: string   // ISO date string, e.g. "2026-07-10"
+  return_date: string | null
+  is_round_trip: boolean
+  target_price: number
+  current_price: number | null
+  currency: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
 
-### Why this matters
-This keeps your frontend predictable and easier to refactor.
+export interface CreateFlightWatchPayload {
+  origin: string
+  destination: string
+  departure_date: string
+  return_date?: string | null
+  is_round_trip: boolean
+  target_price: number
+  currency: string
+  is_active: boolean
+}
 
-### Checkpoint
-- components can use typed props cleanly
+export interface UpdateFlightWatchPayload {
+  origin?: string
+  destination?: string
+  departure_date?: string
+  return_date?: string | null
+  is_round_trip?: boolean
+  target_price?: number
+  currency?: string
+  is_active?: boolean
+}
+```
 
----
+Having these types here means every component that touches watch data is typed from one source.
 
-## Phase 4 — Create API Layer
-
-### What to do
-Create a small API module dedicated to watch-related requests.
-
-### Responsibilities of the API layer
-- create watch
-- fetch all watches
-- fetch one watch if needed
-- update watch
-- delete watch
-
-### Separation of concern
-Do not call `fetch` directly from every component if you can avoid it.
-Centralize backend communication.
-
-### Checkpoint
-- all backend requests can be triggered from one API module
-
----
-
-## Phase 5 — Build the Create Form
-
-### What to build
-A simple form for creating a flight watch.
-
-### Inputs to include
-- origin
-- destination
-- departure date
-- optional return date
-- round trip toggle
-- target price
-- currency
-- active status
-
-### UX guidance
-Keep it plain and readable.
-Validation can be basic at first.
-
-### Checkpoint
-- the user can fill out the form
-- submit triggers a backend create request
+**Checkpoint:** no TypeScript errors when importing these types into a component.
 
 ---
 
-## Phase 6 — Build the Watch List
+## Phase 4 — API layer
 
-### What to build
-A list that displays saved flight watches.
+Create `src/api/watches.ts`. This is the only file that talks to the backend.
 
-### Show at minimum
-- route summary, such as origin to destination
-- departure date
-- optional return date
-- target price
-- current price if available
-- active status
+```typescript
+import { FlightWatch, CreateFlightWatchPayload, UpdateFlightWatchPayload } from "../types/flight-watch"
 
-### Goal
-The user should immediately see whether create and read are working.
+const BASE_URL = import.meta.env.VITE_API_URL
 
-### Checkpoint
-- the list loads from the backend and renders records
+export async function getWatches(): Promise<FlightWatch[]> {
+  const res = await fetch(`${BASE_URL}/watches/`)
+  if (!res.ok) throw new Error("Failed to fetch watches")
+  return res.json()
+}
 
----
+export async function createWatch(data: CreateFlightWatchPayload): Promise<FlightWatch> {
+  const res = await fetch(`${BASE_URL}/watches/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error("Failed to create watch")
+  return res.json()
+}
 
-## Phase 7 — Add Edit Capability
+export async function updateWatch(id: number, data: UpdateFlightWatchPayload): Promise<FlightWatch> {
+  const res = await fetch(`${BASE_URL}/watches/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error("Failed to update watch")
+  return res.json()
+}
 
-### What to do
-Allow the user to update an existing watch.
+export async function deleteWatch(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/watches/${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Failed to delete watch")
+}
+```
 
-### Simple approach
-Use one of these:
-- inline edit
-- modal later
-- reuse the create form for editing
+Keeping all API calls in one place means if the base URL changes or you swap to Axios later, there's exactly one file to update.
 
-For MVP, choose the simplest option.
-
-### Checkpoint
-- the user can update at least one field and save the change
-- the list refreshes correctly
-
----
-
-## Phase 8 — Add Delete Capability
-
-### What to do
-Allow the user to remove a watch.
-
-### UX note
-Use a simple button with a confirmation step if you want, but keep it minimal.
-
-### Checkpoint
-- delete request succeeds
-- the watch disappears from the list
+**Checkpoint:** importing `getWatches` in a component and calling it returns real data from the backend.
 
 ---
 
-## Phase 9 — Improve Basic UX
+## Phase 5 — Build the create form
 
-Only do this after CRUD flow works.
+Create `src/components/FlightWatchForm.tsx`.
 
-### Good small improvements
-- loading state
-- error state
-- empty state
-- success message after create or update
-- form reset after successful create
+Fields to include:
+- origin (text)
+- destination (text)
+- departure date (date input)
+- return date (date input, optional)
+- round trip (checkbox)
+- target price (number)
+- currency (text, pre-filled with "SEK")
+- active (checkbox, defaults to true)
 
-### Avoid overbuilding
-Do not redesign the whole app before functionality works.
+Keep the form controlled — manage values in state with `useState`. On submit, call `createWatch` from the API layer.
 
-### Checkpoint
-The application feels understandable and usable.
+```tsx
+// rough structure
+const [form, setForm] = useState<CreateFlightWatchPayload>({
+  origin: "",
+  destination: "",
+  departure_date: "",
+  return_date: null,
+  is_round_trip: false,
+  target_price: 0,
+  currency: "SEK",
+  is_active: true,
+})
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  await createWatch(form)
+  onSuccess()  // callback to refresh the list
+}
+```
+
+**Checkpoint:** submitting the form creates a record in the database (verify in Swagger or psql).
 
 ---
 
-## Phase 10 — Prepare the Frontend for Future Features
+## Phase 6 — Build the watch list
 
-### What to prepare for later
-- filter by active status
-- sort watches
-- show last checked time
-- show price history
-- show alert badge when target reached
+Create `src/components/FlightWatchList.tsx`.
 
-### Important
-Do not implement all of these now. Just keep the structure open to them.
+Fetch watches on mount using `useEffect` and render each one in a card or row.
 
-### End-of-phase outcome
-You have a frontend that is simple, clean, and connected to a real backend.
+Show at minimum:
+- origin → destination
+- departure date (and return date if it exists)
+- target price and currency
+- current price if not null, otherwise "not checked yet"
+- active status (a badge or label works fine)
+
+```tsx
+useEffect(() => {
+  getWatches().then(setWatches).catch(console.error)
+}, [])
+```
+
+**Checkpoint:** the list loads and shows all records from the database. Adding a new watch through the form and refreshing shows it in the list.
 
 ---
 
-## MVP Frontend Definition
+## Phase 7 — Add edit capability
 
-The frontend MVP is complete when:
+For the MVP, the simplest approach is to reuse `FlightWatchForm` and pre-fill it with the existing record's values when editing.
+
+Alternatively, render a small inline form inside the card. Either approach works at this stage — pick the one that feels cleaner to you.
+
+When the user saves, call `updateWatch(id, changedFields)`. Then refresh the list.
+
+**Checkpoint:** changing the target price on an existing watch saves correctly and reflects in the list.
+
+---
+
+## Phase 8 — Add delete
+
+Add a delete button to each watch card. On click, call `deleteWatch(id)` and remove the item from the list.
+
+A basic confirmation — even just `window.confirm` — is fine for now.
+
+```tsx
+const handleDelete = async (id: number) => {
+  if (!window.confirm("Remove this watch?")) return
+  await deleteWatch(id)
+  setWatches(prev => prev.filter(w => w.id !== id))
+}
+```
+
+**Checkpoint:** deleting a watch removes it from the UI and from the database.
+
+---
+
+## Phase 9 — UX improvements
+
+After the full CRUD flow works, these are worth adding before calling the frontend done:
+
+- loading state while fetching (`isLoading` boolean in state)
+- empty state message when the list has no records
+- error message when a fetch or submit fails
+- reset the create form after a successful submit
+- disable the submit button while a request is in-flight
+
+None of these require a library. Keep it simple.
+
+**Checkpoint:** the app feels predictable and gives feedback when something is happening.
+
+---
+
+## Phase 10 — Structure for later features
+
+Before moving on to background jobs and notifications, make sure the frontend structure won't block future additions:
+
+- the `api/` layer should be easy to extend with new endpoints
+- the `types/` file should be easy to expand with `PriceHistory` and `Notification` interfaces when needed
+- the component structure should support adding a price history chart per watch later
+
+Don't build those things now. Just don't build in a way that makes them painful to add.
+
+---
+
+## MVP complete when
 
 - the app starts
-- the create form works
-- the list loads watches from the backend
-- update works
-- delete works
-- the UI reflects backend data correctly
+- the create form submits and the record appears in the list
+- editing a watch updates it correctly
+- deleting a watch removes it
+- loading and error states are handled
+- no console errors during normal use
 
 ---
 
-## What Not to Build Yet
+## What to skip for now
 
-Do not add these before the MVP works:
-
+- React Router / multi-page navigation
 - authentication screens
-- advanced routing
-- dashboard analytics
-- charts
-- design system complexity
-- dark mode toggles
-- optimistic updates unless you understand them well
+- charts and analytics
+- global state management (Redux, Zustand) — component state is enough for now
+- Tailwind — plain CSS or inline styles are fine until the core works
+- optimistic UI updates
 
 ---
 
-## Suggested Commit Milestones
+## Suggested commits
 
-- `chore: initialize frontend app`
-- `chore: clean starter structure`
-- `feat: add flight watch types`
-- `feat: add watch API module`
-- `feat: add create watch form`
-- `feat: add watch list`
-- `feat: add update and delete actions`
-- `feat: improve loading and error states`
-
----
-
-## Definition of Success
-
-When this instruction is completed, the frontend should let a user manage flight watches without needing direct database access.
+```
+chore: initialize frontend app with Vite and React TS
+chore: clean starter boilerplate
+feat: add flight watch TypeScript types
+feat: add watch API module
+feat: add create watch form
+feat: add watch list with fetch on mount
+feat: add edit and delete for watches
+feat: add loading, error, and empty states
+```

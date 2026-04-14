@@ -1,183 +1,184 @@
-# Flight Price Tracker
+# FareTracker — Flight Price Tracker
 
-A phased fullstack learning project for tracking flight prices and later sending alerts when prices drop below a target threshold.
+A fullstack application for tracking flight prices and getting notified when they drop below a target threshold.
 
-This repository is intentionally planned as an **MVP-first** project. The goal is to build a small working slice, test it, commit it, and then expand the system in controlled phases with clear separation of concerns.
+Built with Python, FastAPI, PostgreSQL, React, and TypeScript.
 
-## Project Goal
+---
 
-Build a fullstack application that allows a user to:
+## Why I built this
 
-- create a flight watch
-- store that watch in PostgreSQL
-- view saved watches
-- update and delete watches
-- later connect to a flight pricing source
-- later compare new prices with stored prices
-- later notify the user when a price drops enough
+I fly between a few cities fairly often and always end up either paying too much or spending too much time manually checking prices. I wanted something that just watches a route and tells me when the price is actually worth it.
 
-## Core Principles
+The project also gave me a good excuse to build something end-to-end — from database schema design to REST API to a React frontend — and to practice structuring a real codebase instead of a tutorial project.
 
-This project should be built with the following mindset:
+---
 
-- **MVP first**: start with the smallest useful version
-- **Incremental delivery**: build a little, test, push, repeat
-- **Scalability in mind**: simple now, but structured for growth
-- **Separation of concerns**: database, backend, and frontend should evolve independently
-- **Testability**: every phase should produce something you can run and verify
-- **Portfolio quality**: structure the repo like a real project, not a one-file experiment
+## What it does (current scope)
+
+Right now the focus is the core flight watch system:
+
+- create a flight watch for a specific route, date, and target price
+- store it in PostgreSQL
+- read, update, and delete watches through a REST API
+- view and manage watches from a React frontend
+
+Coming later:
+
+- connect to a real flight pricing source
+- run background checks on saved watches
+- send an alert (email or Telegram) when a price drops below target
+- show price history over time
+
+---
 
 ## Stack
 
-### Frontend
-- React
-- TypeScript
-- Vite
-- Fetch API or Axios
-- Basic CSS or Tailwind later if wanted
-
-### Backend
-- Python
+**Backend**
+- Python 3.11+
 - FastAPI
 - SQLAlchemy
-- Pydantic
+- Pydantic v2
 - Uvicorn
+- PostgreSQL (psycopg2)
 
-### Database
+**Frontend**
+- React 18
+- TypeScript
+- Vite
+- Fetch API (no extra HTTP library for now)
+
+**Database**
 - PostgreSQL
 
-## Repository Structure
+---
 
-```text
-flight-price-tracker/
+## Project structure
+
+```
+FareTracker-FullStack/
 ├── README.md
 ├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   └── routes/
+│   │       └── watches.py
+│   ├── sql/
+│   │   ├── 001_create_flight_watches.sql
+│   │   └── 002_seed_flight_watches.sql
+│   ├── tests/
+│   ├── requirements.txt
+│   └── .env.example
 ├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── types/
+│   │   └── App.tsx
+│   ├── package.json
+│   └── .env.example
 └── docs/
     ├── backend-instruction.md
     ├── frontend-instruction.md
     └── database-instruction.md
 ```
 
-## Development Strategy
+---
 
-Do not try to build the complete product immediately.
+## Getting started
 
-Use this order:
+### Prerequisites
 
-1. establish repository structure
-2. prepare PostgreSQL design
-3. build backend MVP
-4. test backend manually
-5. connect frontend to backend
-6. test full CRUD flow
-7. push stable milestone
-8. add price-history support
-9. add background checking
-10. add notifications
+- Python 3.11+
+- PostgreSQL running locally
+- Node.js 18+
 
-Each phase should result in a project state that still runs.
+### Backend setup
 
-## MVP Scope
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env       # then fill in your DATABASE_URL
+uvicorn app.main:app --reload
+```
 
-The MVP should support:
+The API will be at `http://localhost:8000` and the auto-generated docs at `http://localhost:8000/docs`.
 
-- creating a flight watch
-- reading all flight watches
-- reading one flight watch
-- updating a flight watch
-- deleting a flight watch
+### Database setup
 
-The MVP should **not** yet include:
+```bash
+psql -U postgres -c "CREATE DATABASE flight_tracker;"
+psql -U postgres -d flight_tracker -f backend/sql/001_create_flight_watches.sql
+psql -U postgres -d flight_tracker -f backend/sql/002_seed_flight_watches.sql
+```
 
-- real flight provider integration
-- scheduled price checking
-- email or Telegram notifications
-- login and user accounts
-- advanced analytics
-- deployment optimization
+### Frontend setup
 
-## Functional Overview
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
 
-A flight watch should minimally contain:
+The app will be at `http://localhost:5173`.
 
-- origin
-- destination
-- departure date
-- optional return date
-- trip type
-- target price
-- currency
-- current price placeholder
-- active status
+---
 
-Later versions may add:
+## Development phases
 
-- provider name
-- last checked timestamp
-- historical price log
-- price drop percent
-- notification status
-- created by user
+The project is built in phases rather than all at once. Each phase produces something that runs.
 
-## Phase Overview
+| Phase | Focus | Status |
+|---|---|---|
+| 1 | Repo structure | Done |
+| 2 | Database design | Done |
+| 3 | Backend config and DB connection | Pending |
+| 4 | CRUD endpoints | Pending |
+| 5 | Manual API testing | Pending |
+| 6 | Frontend scaffold | Pending |
+| 7 | UI for create and list | Pending |
+| 8 | Full frontend-backend wiring | Pending |
+| 9 | Price history support | Pending |
+| 10 | Background checks and notifications | Pending |
 
-### Phase 1
-Create the repository and folder structure.
+---
 
-### Phase 2
-Design the database and document the schema.
+## MVP definition
 
-### Phase 3
-Build backend configuration and connect PostgreSQL.
+The MVP is done when:
 
-### Phase 4
-Implement CRUD endpoints for flight watches.
+- a flight watch can be created through the frontend
+- it gets saved to PostgreSQL through the FastAPI backend
+- the list loads and shows all saved watches
+- individual records can be updated and deleted
+- changes are visible directly in the database
 
-### Phase 5
-Test endpoints in Swagger and Postman.
+Everything after that is an extension.
 
-### Phase 6
-Create frontend project structure.
+---
 
-### Phase 7
-Build UI for creating and listing flight watches.
+## What is intentionally not here yet
 
-### Phase 8
-Connect frontend to backend.
+- authentication or user accounts
+- real flight pricing API integration
+- background job scheduling
+- email or Telegram alerts
+- Docker setup (will add once the core works)
+- Alembic migrations (using plain SQL scripts for now)
 
-### Phase 9
-Add history-ready database structure.
+---
 
-### Phase 10
-Prepare for real price-check integrations and notifications.
+## Docs
 
-## What “Done” Looks Like for MVP
-
-The MVP is complete when you can:
-
-- open the frontend
-- create a flight watch
-- save it to PostgreSQL through the API
-- fetch and display the saved records
-- edit a record
-- delete a record
-- verify changes directly in the database
-
-## How to Work Through This Project
-
-Use the instruction files in the `docs` folder:
-
-- `database-instruction.md`
-- `backend-instruction.md`
-- `frontend-instruction.md`
-
-Read them in that order.
-
-
-## Important Constraint
-
-This project should stay small at the beginning.
-
-Do not build future phases too early. Only add complexity after the current phase is working and tested.
-
+- [Database design](docs/database-instruction.md)
+- [Backend build guide](docs/backend-instruction.md)
+- [Frontend build guide](docs/frontend-instruction.md)

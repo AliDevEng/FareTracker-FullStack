@@ -1,334 +1,208 @@
-# Database Instruction
+# Database — Design and Setup
 
-This document explains how to design and rebuild the PostgreSQL database for the Flight Price Tracker project.
-
-This is written with an MVP-first mindset. The first version should be small, stable, and easy to understand. The schema should also leave room for future growth.
+PostgreSQL is the only database this project needs right now. The goal here is to get a clean schema in place that covers the MVP and has enough thought behind it that it won't need to be completely redesigned once price history and notifications come in later.
 
 ---
 
-## Database Goal
+## Phase 1 — Create the database
 
-Build a PostgreSQL database that can support:
+Nothing fancy here. Just create a dedicated database for the project.
 
-- flight watch records
-- future price history
-- future notifications
-- future user ownership
+```bash
+psql -U postgres
+CREATE DATABASE flight_tracker;
+\q
+```
 
-The MVP should only require one main table, but the structure should be documented so the system can be rebuilt consistently.
-
----
-
-## Database Technology
-
-Use:
-
-- PostgreSQL
-
-Do not overcomplicate the setup in the beginning with multiple schemas, extensions, or unnecessary abstraction.
+Confirm you can connect to it before moving on.
 
 ---
 
-## Phase 1 — Create the Database
+## Phase 2 — Design the main table
 
-### What to do
-Create a PostgreSQL database dedicated to this project.
+The MVP needs one table: `flight_watches`.
 
-### Suggested database name
-- `flight_tracker`
+This stores the routes a user wants to track, along with the price they're targeting and the most recently known price.
 
-### Goal
-You should have a clean, empty database ready for tables.
+### Schema
 
-### Checkpoint
-- the database exists
-- you can connect to it from your SQL client or terminal
-
----
-
-## Phase 2 — Define the MVP Table
-
-For the MVP, create one main table:
-
-- `flight_watches`
-
-This table stores the watches the user creates.
-
-### Required columns
-
-| Column | Type | Null? | Default | Purpose |
-|---|---|---:|---|---|
-| id | SERIAL or IDENTITY | No | auto | Primary key |
-| origin | VARCHAR(100) | No |  | Departure location or airport code |
-| destination | VARCHAR(100) | No |  | Arrival location or airport code |
-| departure_date | DATE | No |  | Outbound travel date |
-| return_date | DATE | Yes | NULL | Return travel date for round trip |
-| is_round_trip | BOOLEAN | No | FALSE | Indicates trip type |
-| target_price | NUMERIC(10,2) | No |  | User-defined desired price |
-| current_price | NUMERIC(10,2) | Yes | NULL | Most recently known price |
+| Column | Type | Nullable | Default | Notes |
+|---|---|---|---|---|
+| id | INTEGER GENERATED ALWAYS AS IDENTITY | No | auto | Primary key |
+| origin | VARCHAR(100) | No | — | Airport code or city |
+| destination | VARCHAR(100) | No | — | Airport code or city |
+| departure_date | DATE | No | — | Outbound travel date |
+| return_date | DATE | Yes | NULL | Only set for round trips |
+| is_round_trip | BOOLEAN | No | FALSE | Whether this is a round trip |
+| target_price | NUMERIC(10,2) | No | — | Price the user wants to pay |
+| current_price | NUMERIC(10,2) | Yes | NULL | Latest known price — NULL until first check |
 | currency | VARCHAR(10) | No | 'SEK' | Currency code |
-| is_active | BOOLEAN | No | TRUE | Whether this watch should still be checked |
-| created_at | TIMESTAMP | No | CURRENT_TIMESTAMP | Record creation time |
-| updated_at | TIMESTAMP | No | CURRENT_TIMESTAMP | Last update time |
+| is_active | BOOLEAN | No | TRUE | Inactive watches are skipped during price checks |
+| created_at | TIMESTAMP | No | CURRENT_TIMESTAMP | |
+| updated_at | TIMESTAMP | No | CURRENT_TIMESTAMP | Updated by application logic, not a DB trigger |
 
-### Why these columns exist
-- `origin` and `destination` identify the route
-- `departure_date` and `return_date` identify the travel window
-- `target_price` defines the alert condition
-- `current_price` stores the latest known price
-- `is_active` allows logical deactivation without deletion
-- timestamps make debugging and history easier later
+A few things worth noting about this design:
+- `current_price` starts NULL because we haven't checked yet. That's intentional and meaningful.
+- `is_active` lets a watch be paused without deleting the record or its history.
+- `updated_at` is managed in code, not by a database trigger. That's fine for now.
 
 ---
 
-## Phase 3 — Add Basic Constraints
+## Phase 3 — Add constraints
 
-### What to do
-Define safe baseline constraints.
+These protect the data from obviously wrong values.
 
-### Recommended constraints
-- primary key on `id`
-- `target_price > 0`
-- `current_price IS NULL OR current_price > 0`
-- optional check: if `is_round_trip = FALSE`, `return_date` may remain NULL
-- optional check: `return_date >= departure_date` when return date exists
+```sql
+CHECK (target_price > 0)
+CHECK (current_price IS NULL OR current_price > 0)
+CHECK (return_date IS NULL OR return_date >= departure_date)
+```
 
-### Why this matters
-This protects the database from obviously bad data.
-
-### Checkpoint
-- the table rejects invalid prices
-- the table structure enforces basic consistency
+The third constraint is the most important one — it prevents a return date that's before the departure date.
 
 ---
 
-## Phase 4 — Write the SQL for Rebuilding the MVP Database
+## Phase 4 — The full CREATE TABLE script
 
-Use a rebuild script that can be understood and rerun safely during development.
-
-### MVP SQL blueprint
+Save this as `backend/sql/001_create_flight_watches.sql`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS flight_watches (
-    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    origin VARCHAR(100) NOT NULL,
-    destination VARCHAR(100) NOT NULL,
-    departure_date DATE NOT NULL,
-    return_date DATE NULL,
-    is_round_trip BOOLEAN NOT NULL DEFAULT FALSE,
-    target_price NUMERIC(10,2) NOT NULL CHECK (target_price > 0),
-    current_price NUMERIC(10,2) NULL CHECK (current_price IS NULL OR current_price > 0),
-    currency VARCHAR(10) NOT NULL DEFAULT 'SEK',
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    origin          VARCHAR(100) NOT NULL,
+    destination     VARCHAR(100) NOT NULL,
+    departure_date  DATE NOT NULL,
+    return_date     DATE NULL,
+    is_round_trip   BOOLEAN NOT NULL DEFAULT FALSE,
+    target_price    NUMERIC(10,2) NOT NULL CHECK (target_price > 0),
+    current_price   NUMERIC(10,2) NULL CHECK (current_price IS NULL OR current_price > 0),
+    currency        VARCHAR(10) NOT NULL DEFAULT 'SEK',
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
     CONSTRAINT valid_return_date CHECK (
         return_date IS NULL OR return_date >= departure_date
     )
 );
 ```
 
-### Important note
-You can later switch to migration tooling, but for the beginning this blueprint is enough.
+`IF NOT EXISTS` means this is safe to run more than once without blowing up.
 
 ---
 
-## Phase 5 — Seed a Small Set of Test Data
+## Phase 5 — Seed data for development
 
-### Why seed data matters
-It helps you test the backend and frontend early.
+Having a few rows in the database from the start makes it much easier to test the API and the frontend.
 
-### Recommended sample records
-Create 2 to 3 watches manually.
-
-### Example data ideas
-- Copenhagen to Barcelona
-- Malmö to London
-- Stockholm to Rome
-
-### Example seed SQL
+Save this as `backend/sql/002_seed_flight_watches.sql`.
 
 ```sql
 INSERT INTO flight_watches
-(origin, destination, departure_date, return_date, is_round_trip, target_price, current_price, currency, is_active)
+    (origin, destination, departure_date, return_date, is_round_trip, target_price, current_price, currency, is_active)
 VALUES
-('Copenhagen', 'Barcelona', '2026-07-10', '2026-07-17', TRUE, 1800.00, 2200.00, 'SEK', TRUE),
-('Malmö', 'London', '2026-08-03', NULL, FALSE, 950.00, NULL, 'SEK', TRUE),
-('Stockholm', 'Rome', '2026-09-12', '2026-09-18', TRUE, 2100.00, 2450.00, 'SEK', FALSE);
+    ('CPH', 'BCN', '2026-07-10', '2026-07-17', TRUE,  1800.00, 2200.00, 'SEK', TRUE),
+    ('MMX', 'LHR', '2026-08-03', NULL,          FALSE,  950.00, NULL,    'SEK', TRUE),
+    ('ARN', 'FCO', '2026-09-12', '2026-09-18', TRUE,  2100.00, 2450.00, 'SEK', FALSE);
 ```
 
-### Checkpoint
-- test rows can be inserted successfully
-- selecting from the table returns expected values
+The third record uses `is_active = FALSE` on purpose — good for testing that the filter works.
 
 ---
 
-## Phase 6 — Plan for the First Future Table
+## Phase 6 — Plan for price history (don't build yet)
 
-After the MVP works, prepare for price history.
+Once the MVP is working, the natural next table is `price_history`. Every time the backend checks a price, it logs the result here.
 
-### First future table
-- `price_history`
+### Proposed schema
 
-### Purpose
-Store every checked price over time.
-
-### Suggested columns
-| Column | Type | Null? | Purpose |
-|---|---|---:|---|
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
 | id | IDENTITY | No | Primary key |
-| flight_watch_id | INTEGER | No | Foreign key to `flight_watches.id` |
-| price | NUMERIC(10,2) | No | Observed price |
-| currency | VARCHAR(10) | No | Currency code |
-| checked_at | TIMESTAMP | No | When the price was checked |
-| source_name | VARCHAR(100) | Yes | Which provider/API returned the price |
+| flight_watch_id | INTEGER | No | FK to `flight_watches.id` |
+| price | NUMERIC(10,2) | No | Observed price at this moment |
+| currency | VARCHAR(10) | No | |
+| checked_at | TIMESTAMP | No | When the check ran |
+| source_name | VARCHAR(100) | Yes | Which provider returned this price |
 
-### Recommended relationship
-- many `price_history` rows can belong to one `flight_watches` row
+One `flight_watches` row → many `price_history` rows.
 
-### Do not build this table on day one unless MVP is complete.
-
----
-
-## Phase 7 — Plan for Notifications
-
-Only after price checking exists.
-
-### Future table
-- `notifications`
-
-### Purpose
-Log alerts that were sent.
-
-### Suggested columns
-- id
-- flight_watch_id
-- channel
-- message
-- sent_at
-- status
-
-Again, do not build this before it is needed.
+Don't create this table until the MVP CRUD is fully working.
 
 ---
 
-## Phase 8 — Decide on Naming Standards
+## Phase 7 — Plan for notifications (even later)
 
-### Recommended table naming
-Use plural snake_case table names:
-- `flight_watches`
-- `price_history`
-- `notifications`
+When background checks are running, a `notifications` table will log which alerts were sent and their status.
 
-### Recommended column naming
-Use snake_case consistently:
-- `departure_date`
-- `target_price`
-- `created_at`
+Columns: `id`, `flight_watch_id`, `channel` (email / telegram), `message`, `sent_at`, `status`.
 
-### Why this matters
-It keeps ORM mapping and SQL scripts easier to read.
+Sketch it now, build it later.
 
 ---
 
-## Phase 9 — Create a Rebuild Strategy
+## Phase 8 — Naming conventions
 
-You asked for a structure that can always be rebuilt.
+Stick to these throughout the project to keep ORM mapping simple:
 
-### Recommended approach
-Keep SQL scripts in a dedicated folder, for example:
+- table names: plural snake_case (`flight_watches`, `price_history`, `notifications`)
+- column names: snake_case (`departure_date`, `target_price`, `created_at`)
+- no abbreviations in column names unless they're standard like `id`
 
-```text
+---
+
+## Phase 9 — SQL folder structure
+
+Keep all database scripts under `backend/sql/` with a numbered prefix:
+
+```
 backend/sql/
 ├── 001_create_flight_watches.sql
 ├── 002_seed_flight_watches.sql
-└── 003_future_notes.sql
+└── 003_create_price_history.sql   ← add later
 ```
 
-### MVP use
-At minimum create:
-- one script for table creation
-- one script for seed data
-
-### Goal
-Anyone can recreate the same local database structure later.
+The numbering makes the intended run order obvious. Anyone cloning the project can rebuild the database by running them in sequence.
 
 ---
 
-## Phase 10 — Move Toward Migrations Later
+## Phase 10 — Migrations later
 
-After the MVP is stable, you can introduce migration tooling.
+Plain SQL scripts work fine for the MVP phase. Once the schema starts changing regularly, add Alembic:
 
-### Recommended future step
-Use Alembic later for:
-- schema changes
-- versioned migrations
-- safer evolution over time
+```bash
+pip install alembic
+alembic init alembic
+```
 
-### Important
-Do not let migration tooling delay the MVP.
+Then each schema change becomes a versioned migration file instead of a manual script. That's the right tool once things stabilize — it's overkill before the first working version.
 
 ---
 
-## SQL Reference Summary
+## SQL reference
 
-### MVP database object
+### MVP tables
 - `flight_watches`
 
-### MVP required columns
-- `id`
-- `origin`
-- `destination`
-- `departure_date`
-- `return_date`
-- `is_round_trip`
-- `target_price`
-- `current_price`
-- `currency`
-- `is_active`
-- `created_at`
-- `updated_at`
-
-### Future database objects
+### Planned future tables
 - `price_history`
 - `notifications`
 
 ---
 
-## MVP Database Definition of Success
+## Done when
 
-The database phase is complete when:
-
-- PostgreSQL database exists
-- `flight_watches` table exists
-- constraints work
-- seed data can be inserted
-- backend can connect and read/write records
+- `flight_tracker` database exists
+- `flight_watches` table is created with all constraints
+- seed data inserts without errors
+- the backend can connect to the database and read/write records
 
 ---
 
-## What Not to Build Yet
+## Suggested commits
 
-Do not add these in the first database version:
-
-- users table
-- roles and permissions
-- notification templates
-- audit tables
-- provider-specific tables
-- heavy normalization too early
-
----
-
-## Suggested Commit Milestones
-
-- `docs: define database schema phases`
-- `feat: create flight_watches table`
-- `feat: add seed data for flight_watches`
-- `refactor: prepare sql folder for rebuild scripts`
-
----
-
-## Definition of Success
-
-When this instruction is completed, you should be able to rebuild the project database from scratch in a repeatable way.
+```
+docs: define initial database schema
+feat: add flight_watches table SQL
+feat: add seed data for development
+```

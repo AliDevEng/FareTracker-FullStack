@@ -1,329 +1,407 @@
-# Backend Instruction
+# Backend — Build Guide
 
-This document explains how to build the backend in small phases. Follow the phases in order. Do not jump ahead before the current phase works.
+The backend is a FastAPI application that sits in front of PostgreSQL. Its job is to validate input, talk to the database, and return clean JSON. That's it. No frontend concerns, no business logic living in route handlers long-term.
 
-The backend should remain focused on API logic, validation, and communication with the database. It should not contain frontend concerns.
-
----
-
-## Backend Goal
-
-Build a Python FastAPI backend that can:
-
-- connect to PostgreSQL
-- expose CRUD endpoints for flight watches
-- validate input data
-- return structured JSON responses
-- remain easy to extend later
+Build it in phases. Each phase should leave you with something that runs.
 
 ---
 
-## Recommended Backend Folder Structure
+## Target folder structure
 
-```text
+```
 backend/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py
-│   ├── database.py
-│   ├── models.py
-│   ├── schemas.py
-│   ├── config.py
-│   ├── dependencies.py
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   └── watches.py
-│   └── services/
-│       └── __init__.py
+│   ├── main.py          ← app entry point, routers registered here
+│   ├── database.py      ← engine, session, base
+│   ├── models.py        ← SQLAlchemy ORM models
+│   ├── schemas.py       ← Pydantic request/response schemas
+│   ├── config.py        ← environment variable loading
+│   ├── dependencies.py  ← shared FastAPI dependencies (e.g. get_db)
+│   └── routes/
+│       ├── __init__.py
+│       └── watches.py   ← all /watches endpoints
+├── sql/
+│   ├── 001_create_flight_watches.sql
+│   └── 002_seed_flight_watches.sql
 ├── tests/
 ├── requirements.txt
 ├── .env
+├── .env.example
 └── .gitignore
 ```
 
-You may start simpler, but keep this target structure in mind.
+You don't need all of this on day one. Start simple and grow into it.
 
 ---
 
-## Phase 1 — Prepare Backend Workspace
+## Phase 1 — Set up the workspace
 
-### What to do
-- Create the `backend` folder
-- Create a Python virtual environment
-- Add `requirements.txt`
-- Add `.gitignore`
-- Add `.env`
-- Create the `app` package
+Create the `backend/` folder and get the Python environment ready.
 
-### Minimum outcome
-You should have a clean backend folder ready for installation and development.
+```bash
+mkdir backend && cd backend
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+```
 
-### Checkpoint
-- the folder structure exists
-- the virtual environment works
-- dependencies can be installed
+Create the `app/` package:
 
----
+```bash
+mkdir -p app/routes app/services sql tests
+touch app/__init__.py app/routes/__init__.py
+```
 
-## Phase 2 — Install Backend Dependencies
+Add a `.gitignore` at minimum containing:
 
-### What to do
-Install the first backend dependencies:
+```
+venv/
+__pycache__/
+*.pyc
+.env
+```
 
-- FastAPI
-- Uvicorn
-- SQLAlchemy
-- psycopg2-binary
-- python-dotenv
-- Pydantic
-
-### Why this phase exists
-This gives you the minimum stack needed for a PostgreSQL-backed API.
-
-### Checkpoint
-- dependencies install without errors
-- `pip freeze` shows the expected packages
+**Checkpoint:** the folder structure is in place and the virtual environment activates.
 
 ---
 
-## Phase 3 — Configure Environment Settings
+## Phase 2 — Install dependencies
 
-### What to do
-- Create a `.env` file
-- Store the PostgreSQL connection string in it
-- Add a configuration module that loads environment variables
+Create `requirements.txt`:
 
-### Environment variables to define
-At minimum:
+```
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pydantic[email]
+```
 
-- `DATABASE_URL`
+Install:
 
-Later you may add:
+```bash
+pip install -r requirements.txt
+```
 
-- `APP_ENV`
-- `DEBUG`
-- `FRONTEND_URL`
-
-### Goal
-The application should not hardcode database credentials.
-
-### Checkpoint
-- the backend can read the environment variable successfully
+**Checkpoint:** `pip freeze` shows all expected packages with no errors.
 
 ---
 
-## Phase 4 — Create Database Connection Layer
+## Phase 3 — Environment configuration
 
-### What to do
-Create a dedicated database module that handles:
+Create `.env`:
 
-- engine creation
-- session creation
-- declarative base
-- dependency for obtaining a database session in routes
+```env
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/flight_tracker
+```
 
-### Separation of concern
-This file should only manage database connectivity, not business rules.
+Create `.env.example` (safe to commit — no real credentials):
 
-### Checkpoint
-- the backend starts without crashing
-- importing the database layer works
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/flight_tracker
+```
 
----
+Create `app/config.py`:
 
-## Phase 5 — Create the Domain Model
+```python
+from pydantic_settings import BaseSettings
 
-### What to build
-Create the main backend model for a flight watch.
+class Settings(BaseSettings):
+    database_url: str
 
-The backend model should reflect the database design from `database-instruction.md`.
+    class Config:
+        env_file = ".env"
 
-### Initial entity
-Use one main entity:
+settings = Settings()
+```
 
-- `FlightWatch`
+Note: `pydantic-settings` is a separate package from Pydantic v2 — add it to `requirements.txt` if needed (`pydantic-settings`).
 
-### MVP fields to support
-- id
-- origin
-- destination
-- departure_date
-- return_date
-- is_round_trip
-- target_price
-- current_price
-- currency
-- is_active
-- created_at
-- updated_at
-
-### Rule
-Keep it simple. Do not add users or notifications yet.
-
-### Checkpoint
-- the ORM model exists
-- it matches the database schema
+**Checkpoint:** `settings.database_url` returns the correct value when imported.
 
 ---
 
-## Phase 6 — Create Pydantic Schemas
+## Phase 4 — Database connection layer
 
-### What to do
-Create separate schemas for:
+Create `app/database.py`:
 
-- create request
-- update request
-- response model
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from app.config import settings
 
-### Why separate them
-This keeps validation logic explicit and prevents accidental overexposure of fields.
+engine = create_engine(settings.database_url)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-### Recommendations
-- create schema for create input
-- create schema for update input with optional fields
-- create schema for response output
-- use proper date and numeric types
+class Base(DeclarativeBase):
+    pass
+```
 
-### Checkpoint
-- request validation works
-- response output is structured and predictable
+Create `app/dependencies.py`:
 
----
+```python
+from app.database import SessionLocal
 
-## Phase 7 — Create the FastAPI App Entry Point
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+```
 
-### What to do
-Create the main application file.
+This dependency is injected into route functions. The session opens, the route runs, the session closes — regardless of whether the route succeeded or raised an exception.
 
-It should:
-- initialize FastAPI
-- include routers
-- provide a root health endpoint
-- optionally create tables only if you are using temporary startup creation for MVP
-
-### Important note
-For learning, it is acceptable to create tables on startup in a very early MVP.
-For a cleaner project, move toward explicit SQL scripts or migrations later.
-
-### Checkpoint
-- the server starts
-- `/docs` opens successfully
-- the root endpoint returns a message
+**Checkpoint:** importing `database.py` and `dependencies.py` works without crashing.
 
 ---
 
-## Phase 8 — Build CRUD Routes for Flight Watches
+## Phase 5 — The ORM model
 
-### What to implement
-Create routes for:
+Create `app/models.py`:
 
-- create a watch
-- get all watches
-- get one watch by id
-- update a watch
-- delete a watch
+```python
+from sqlalchemy import Boolean, Column, Date, Integer, Numeric, String, TIMESTAMP, func
+from app.database import Base
 
-### Behavior expectations
-- return `404` when a record does not exist
-- validate incoming payloads
-- use database sessions correctly
-- return meaningful JSON
+class FlightWatch(Base):
+    __tablename__ = "flight_watches"
 
-### Keep this phase narrow
-Do not add price-check services yet.
+    id             = Column(Integer, primary_key=True, index=True)
+    origin         = Column(String(100), nullable=False)
+    destination    = Column(String(100), nullable=False)
+    departure_date = Column(Date, nullable=False)
+    return_date    = Column(Date, nullable=True)
+    is_round_trip  = Column(Boolean, nullable=False, default=False)
+    target_price   = Column(Numeric(10, 2), nullable=False)
+    current_price  = Column(Numeric(10, 2), nullable=True)
+    currency       = Column(String(10), nullable=False, default="SEK")
+    is_active      = Column(Boolean, nullable=False, default=True)
+    created_at     = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at     = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
+```
 
-### Checkpoint
-You can use Swagger to create and manage records end-to-end.
+This mirrors the `flight_watches` table from `database-instruction.md`. Column names match exactly — that matters for SQLAlchemy mapping.
 
----
-
-## Phase 9 — Manual Testing
-
-### What to do
-Test all endpoints using:
-- FastAPI Swagger UI
-- Postman or Insomnia
-
-### Scenarios to test
-- valid create request
-- invalid create request
-- read all records
-- read one existing record
-- read one non-existing record
-- update one record
-- delete one record
-- delete non-existing record
-
-### Checkpoint
-Every CRUD path has been tested at least once manually.
+**Checkpoint:** the model imports cleanly and reflects the database schema.
 
 ---
 
-## Phase 10 — Refactor for Growth
+## Phase 6 — Pydantic schemas
 
-Only begin this phase after MVP works.
+Three schemas cover the main cases: creating a watch, updating one, and returning one in a response.
 
-### What to improve
-- move reusable logic into service functions
-- separate route logic from business logic
-- prepare a `services` folder
-- add better error handling
-- prepare test folders
-- add migration tooling later
+Create `app/schemas.py`:
 
-### Future-ready backend extensions
-Later you can add:
-- price provider integration
-- scheduled jobs
-- notification service
-- price history logic
-- user ownership
+```python
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Optional
+from pydantic import BaseModel, field_validator
 
-### End-of-phase outcome
-You now have a backend that is small, clean, and ready to grow.
+class FlightWatchCreate(BaseModel):
+    origin: str
+    destination: str
+    departure_date: date
+    return_date: Optional[date] = None
+    is_round_trip: bool = False
+    target_price: Decimal
+    currency: str = "SEK"
+    is_active: bool = True
+
+    @field_validator("target_price")
+    @classmethod
+    def price_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("target_price must be greater than 0")
+        return v
+
+class FlightWatchUpdate(BaseModel):
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    departure_date: Optional[date] = None
+    return_date: Optional[date] = None
+    is_round_trip: Optional[bool] = None
+    target_price: Optional[Decimal] = None
+    currency: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class FlightWatchResponse(BaseModel):
+    id: int
+    origin: str
+    destination: str
+    departure_date: date
+    return_date: Optional[date]
+    is_round_trip: bool
+    target_price: Decimal
+    current_price: Optional[Decimal]
+    currency: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+```
+
+`FlightWatchUpdate` uses all optional fields so a PATCH request can update only what changed.
+`from_attributes = True` is what lets Pydantic serialize SQLAlchemy models directly.
+
+**Checkpoint:** schemas validate and reject bad input (try a negative `target_price`).
 
 ---
 
-## MVP Backend Definition
+## Phase 7 — App entry point
 
-The backend MVP is complete when:
+Create `app/main.py`:
 
-- FastAPI runs locally
+```python
+from fastapi import FastAPI
+from app.routes import watches
+
+app = FastAPI(title="FareTracker API", version="0.1.0")
+
+app.include_router(watches.router, prefix="/watches", tags=["watches"])
+
+@app.get("/")
+def health_check():
+    return {"status": "ok"}
+```
+
+Start the server:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+**Checkpoint:** `http://localhost:8000/docs` opens and the `/` endpoint returns `{"status": "ok"}`.
+
+---
+
+## Phase 8 — CRUD routes
+
+Create `app/routes/watches.py`:
+
+```python
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+
+from app import models, schemas
+from app.dependencies import get_db
+
+router = APIRouter()
+
+@router.post("/", response_model=schemas.FlightWatchResponse, status_code=status.HTTP_201_CREATED)
+def create_watch(payload: schemas.FlightWatchCreate, db: Session = Depends(get_db)):
+    watch = models.FlightWatch(**payload.model_dump())
+    db.add(watch)
+    db.commit()
+    db.refresh(watch)
+    return watch
+
+@router.get("/", response_model=List[schemas.FlightWatchResponse])
+def get_watches(db: Session = Depends(get_db)):
+    return db.query(models.FlightWatch).all()
+
+@router.get("/{watch_id}", response_model=schemas.FlightWatchResponse)
+def get_watch(watch_id: int, db: Session = Depends(get_db)):
+    watch = db.query(models.FlightWatch).filter(models.FlightWatch.id == watch_id).first()
+    if not watch:
+        raise HTTPException(status_code=404, detail="Watch not found")
+    return watch
+
+@router.patch("/{watch_id}", response_model=schemas.FlightWatchResponse)
+def update_watch(watch_id: int, payload: schemas.FlightWatchUpdate, db: Session = Depends(get_db)):
+    watch = db.query(models.FlightWatch).filter(models.FlightWatch.id == watch_id).first()
+    if not watch:
+        raise HTTPException(status_code=404, detail="Watch not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(watch, field, value)
+    db.commit()
+    db.refresh(watch)
+    return watch
+
+@router.delete("/{watch_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_watch(watch_id: int, db: Session = Depends(get_db)):
+    watch = db.query(models.FlightWatch).filter(models.FlightWatch.id == watch_id).first()
+    if not watch:
+        raise HTTPException(status_code=404, detail="Watch not found")
+    db.delete(watch)
+    db.commit()
+```
+
+A few design decisions worth noting:
+- `exclude_unset=True` in the PATCH route is important — it means only fields the client actually sent get updated.
+- `DELETE` returns `204 No Content`, not `200`. That's the correct HTTP status for a successful deletion with no body.
+- Every route that looks up by ID raises a `404` if nothing is found. The frontend should handle that.
+
+**Checkpoint:** all five endpoints are visible in Swagger and can be called successfully.
+
+---
+
+## Phase 9 — Manual testing
+
+Before moving to the frontend, test every code path through Swagger UI (`/docs`) or Postman.
+
+Scenarios to cover:
+
+| Scenario | Expected result |
+|---|---|
+| POST valid watch | 201 with created record |
+| POST with negative target_price | 422 validation error |
+| POST with missing required field | 422 validation error |
+| GET all watches | 200 with list |
+| GET one existing watch | 200 with record |
+| GET non-existing watch | 404 |
+| PATCH one field on existing watch | 200 with updated record |
+| PATCH non-existing watch | 404 |
+| DELETE existing watch | 204, record gone |
+| DELETE non-existing watch | 404 |
+
+Run each one. If something behaves unexpectedly, fix it before moving on.
+
+**Checkpoint:** every row in the table above has been manually verified.
+
+---
+
+## Phase 10 — Refactor before frontend
+
+Once the MVP routes all work, clean up before wiring up the frontend.
+
+What's worth doing now:
+- move inline DB logic into a `services/watches.py` module so routes just call service functions
+- add `pytest` and write a few basic tests for create and delete
+- add proper error messages instead of bare `"Watch not found"` strings
+- double-check that `.env` is in `.gitignore` and never committed
+
+What to skip for now:
+- Alembic migrations (use SQL scripts while the schema is still changing)
+- Docker (add it once the code itself works)
+- authentication (no users yet)
+
+---
+
+## MVP complete when
+
+- FastAPI starts without errors
 - PostgreSQL is connected
-- a flight watch can be created
-- a flight watch can be listed
-- a flight watch can be updated
-- a flight watch can be deleted
-- the backend returns predictable JSON responses
+- all five CRUD endpoints work
+- input validation rejects bad data
+- manual test coverage across all scenarios
 
 ---
 
-## What Not to Build Yet
+## Suggested commits
 
-Do not add these before the MVP works:
-
-- authentication
-- background workers
-- email alerts
-- Telegram alerts
-- real flight APIs
-- complex filtering
-- Docker if it slows you down
-
----
-
-## Suggested Commit Milestones
-
-- `chore: initialize backend structure`
-- `chore: add backend dependencies`
-- `feat: add environment config`
-- `feat: add database connection layer`
-- `feat: add flight watch model and schemas`
-- `feat: add watch CRUD routes`
-- `test: verify CRUD endpoints manually`
-
----
-
-## Definition of Success
-
-When this instruction is completed, the backend should be independently usable even without the frontend.
+```
+chore: initialize backend structure and venv
+chore: add backend dependencies
+feat: add environment config and settings module
+feat: add database connection layer
+feat: add flight watch model
+feat: add pydantic schemas for watch create, update, response
+feat: add app entry point and health check
+feat: add watch CRUD routes
+test: manual verification of all CRUD endpoints
+```
