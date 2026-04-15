@@ -15,6 +15,7 @@ frontend/dist/
 frontend/dist-ssr/
 frontend/.vite/
 frontend/coverage/
+frontend/.git.backup/
 *.local
 
 # ── Logs ──────────────────────────────────────────────────
