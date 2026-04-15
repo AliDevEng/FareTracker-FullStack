@@ -278,7 +278,7 @@ uvicorn app.main:app --reload
 
 ---
 
-## Phase 8 — CRUD routes
+## Phase 8 — CRUD routes ✓
 
 Create `app/routes/watches.py`:
 
@@ -340,7 +340,7 @@ A few design decisions worth noting:
 
 ---
 
-## Phase 9 — Manual testing
+## Phase 9 — Manual testing ✓
 
 Before moving to the frontend, test every code path through Swagger UI (`/docs`) or Postman.
 
@@ -365,7 +365,7 @@ Run each one. If something behaves unexpectedly, fix it before moving on.
 
 ---
 
-## Phase 10 — Refactor before frontend
+## Phase 10 — Refactor before frontend ✓
 
 Once the MVP routes all work, clean up before wiring up the frontend.
 

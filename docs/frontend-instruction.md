@@ -1,8 +1,21 @@
 # Frontend — Build Guide
 
-The frontend is a React + TypeScript app built with Vite. Its job is to let the user manage flight watches through a UI that talks to the FastAPI backend.
+The frontend is a React + TypeScript app built with Vite. It uses Tailwind CSS for styling, shadcn/ui for components, TanStack Query for server state, and React Hook Form + Zod for form handling.
 
 Build this after the backend CRUD is working. The frontend should not contain validation logic that belongs in the API, and it should not make assumptions about database structure.
+
+---
+
+## Stack
+
+| Layer | Library |
+|---|---|
+| Build tool | Vite |
+| UI framework | React 18 + TypeScript |
+| Styling | Tailwind CSS |
+| Component library | shadcn/ui (Radix UI + Tailwind) |
+| Server state | TanStack Query v5 |
+| Forms | React Hook Form + Zod |
 
 ---
 
@@ -12,19 +25,23 @@ Build this after the backend CRUD is working. The frontend should not contain va
 frontend/
 ├── src/
 │   ├── api/
-│   │   └── watches.ts       ← all backend API calls live here
+│   │   └── watches.ts           ← all backend API calls live here
 │   ├── components/
+│   │   ├── ui/                  ← shadcn/ui generated components
 │   │   ├── FlightWatchForm.tsx
 │   │   ├── FlightWatchList.tsx
 │   │   └── FlightWatchCard.tsx
 │   ├── pages/
 │   │   └── HomePage.tsx
 │   ├── types/
-│   │   └── flight-watch.ts  ← shared TypeScript types
+│   │   └── flight-watch.ts      ← shared TypeScript types
+│   ├── lib/
+│   │   └── utils.ts             ← shadcn/ui utility (cn helper)
 │   ├── App.tsx
 │   ├── main.tsx
-│   └── styles/
+│   └── index.css                ← Tailwind directives
 ├── public/
+├── components.json              ← shadcn/ui config
 ├── .env
 ├── .env.example
 └── package.json
@@ -38,10 +55,7 @@ frontend/
 npm create vite@latest frontend -- --template react-ts
 cd frontend
 npm install
-npm run dev
 ```
-
-Confirm the default Vite page loads at `http://localhost:5173` before touching anything else.
 
 Add a `.env` file:
 
@@ -55,46 +69,172 @@ And `.env.example`:
 VITE_API_URL=http://localhost:8000
 ```
 
-**Checkpoint:** dev server starts and the default page is visible.
+**Checkpoint:** `npm run dev` starts and the default Vite page is visible at `http://localhost:5173`.
 
 ---
 
-## Phase 2 — Clean the starter project
+## Phase 2 — Install and configure Tailwind CSS
 
-The default Vite template includes boilerplate that gets in the way. Strip it down:
+```bash
+npm install -D tailwindcss @tailwindcss/vite
+```
 
-- delete the default CSS content or replace with a minimal reset
-- remove the counter demo from `App.tsx`
-- keep `main.tsx` as-is (it just mounts the app)
-- keep the folder structure clean and intentional from the start
+In `vite.config.ts`, add the Tailwind plugin:
+
+```ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})
+```
+
+Replace the contents of `src/index.css` with just:
+
+```css
+@import "tailwindcss";
+```
+
+Make sure `main.tsx` imports `index.css`.
+
+**Checkpoint:** Add `className="text-blue-500"` to any element and confirm the color applies.
+
+---
+
+## Phase 3 — Configure path alias (required for shadcn/ui)
+
+shadcn/ui imports from `@/components/...`. Set up the alias.
+
+Install `@types/node`:
+
+```bash
+npm install -D @types/node
+```
+
+Update `vite.config.ts`:
+
+```ts
+import path from "path"
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+})
+```
+
+Update `tsconfig.app.json` — add under `compilerOptions`:
+
+```json
+"baseUrl": ".",
+"paths": {
+  "@/*": ["./src/*"]
+}
+```
+
+**Checkpoint:** `import { something } from "@/lib/utils"` resolves without a TypeScript error.
+
+---
+
+## Phase 4 — Install and configure shadcn/ui
+
+```bash
+npx shadcn@latest init
+```
+
+When prompted:
+- Style: Default
+- Base color: Slate (or your preference)
+- CSS variables: Yes
+
+This creates `components.json` and sets up `src/lib/utils.ts` and `src/index.css`.
+
+Add your first component to test the setup:
+
+```bash
+npx shadcn@latest add button card badge input label
+```
+
+**Checkpoint:** Import `<Button>` from `@/components/ui/button` and render it — it should appear styled.
+
+---
+
+## Phase 5 — Install TanStack Query, React Hook Form, and Zod
+
+```bash
+npm install @tanstack/react-query @tanstack/react-query-devtools
+npm install react-hook-form @hookform/resolvers zod
+```
+
+Wrap the app with `QueryClientProvider` in `src/main.tsx`:
+
+```tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import './index.css'
+import App from './App.tsx'
+
+const queryClient = new QueryClient()
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <App />
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  </StrictMode>,
+)
+```
+
+**Checkpoint:** The app still runs. The TanStack Query Devtools panel is visible in the bottom corner.
+
+---
+
+## Phase 6 — Clean the starter project
+
+Strip out Vite boilerplate:
+
+- Remove content from `App.css` (or delete it)
+- Remove the default counter demo from `App.tsx`
+- Keep `main.tsx` as-is
 
 ```tsx
 // App.tsx after cleanup
 function App() {
   return (
-    <div>
-      <h1>FareTracker</h1>
-    </div>
+    <main className="min-h-screen bg-background p-8">
+      <h1 className="text-3xl font-bold">FareTracker</h1>
+    </main>
   )
 }
 
 export default App
 ```
 
-**Checkpoint:** the app still runs with no console errors and the cleaned-up page is visible.
+**Checkpoint:** App runs, shows the heading with Tailwind styles, no console errors.
 
 ---
 
-## Phase 3 — Define TypeScript types
+## Phase 7 — Define TypeScript types
 
-Create `src/types/flight-watch.ts`. This type should match what the backend returns.
+Create `src/types/flight-watch.ts`. This type mirrors what the backend returns.
 
 ```typescript
 export interface FlightWatch {
   id: number
   origin: string
   destination: string
-  departure_date: string   // ISO date string, e.g. "2026-07-10"
+  departure_date: string
   return_date: string | null
   is_round_trip: boolean
   target_price: number
@@ -128,18 +268,41 @@ export interface UpdateFlightWatchPayload {
 }
 ```
 
-Having these types here means every component that touches watch data is typed from one source.
-
-**Checkpoint:** no TypeScript errors when importing these types into a component.
+**Checkpoint:** No TypeScript errors when importing these types.
 
 ---
 
-## Phase 4 — API layer
+## Phase 8 — Define Zod schemas for forms
+
+Create `src/lib/schemas.ts`. These drive form validation and are derived from the TypeScript types.
+
+```typescript
+import { z } from "zod"
+
+export const createWatchSchema = z.object({
+  origin: z.string().min(2, "Origin is required"),
+  destination: z.string().min(2, "Destination is required"),
+  departure_date: z.string().min(1, "Departure date is required"),
+  return_date: z.string().nullable().optional(),
+  is_round_trip: z.boolean(),
+  target_price: z.coerce.number().positive("Price must be greater than 0"),
+  currency: z.string().min(1),
+  is_active: z.boolean(),
+})
+
+export type CreateWatchFormValues = z.infer<typeof createWatchSchema>
+```
+
+**Checkpoint:** `z.infer<typeof createWatchSchema>` matches `CreateFlightWatchPayload`.
+
+---
+
+## Phase 9 — API layer
 
 Create `src/api/watches.ts`. This is the only file that talks to the backend.
 
 ```typescript
-import { FlightWatch, CreateFlightWatchPayload, UpdateFlightWatchPayload } from "../types/flight-watch"
+import type { FlightWatch, CreateFlightWatchPayload, UpdateFlightWatchPayload } from "@/types/flight-watch"
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -175,136 +338,154 @@ export async function deleteWatch(id: number): Promise<void> {
 }
 ```
 
-Keeping all API calls in one place means if the base URL changes or you swap to Axios later, there's exactly one file to update.
-
-**Checkpoint:** importing `getWatches` in a component and calling it returns real data from the backend.
+**Checkpoint:** Importing `getWatches` and calling it returns real data from the backend.
 
 ---
 
-## Phase 5 — Build the create form
-
-Create `src/components/FlightWatchForm.tsx`.
-
-Fields to include:
-- origin (text)
-- destination (text)
-- departure date (date input)
-- return date (date input, optional)
-- round trip (checkbox)
-- target price (number)
-- currency (text, pre-filled with "SEK")
-- active (checkbox, defaults to true)
-
-Keep the form controlled — manage values in state with `useState`. On submit, call `createWatch` from the API layer.
-
-```tsx
-// rough structure
-const [form, setForm] = useState<CreateFlightWatchPayload>({
-  origin: "",
-  destination: "",
-  departure_date: "",
-  return_date: null,
-  is_round_trip: false,
-  target_price: 0,
-  currency: "SEK",
-  is_active: true,
-})
-
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  await createWatch(form)
-  onSuccess()  // callback to refresh the list
-}
-```
-
-**Checkpoint:** submitting the form creates a record in the database (verify in Swagger or psql).
-
----
-
-## Phase 6 — Build the watch list
+## Phase 10 — Build the watch list with TanStack Query
 
 Create `src/components/FlightWatchList.tsx`.
 
-Fetch watches on mount using `useEffect` and render each one in a card or row.
-
-Show at minimum:
-- origin → destination
-- departure date (and return date if it exists)
-- target price and currency
-- current price if not null, otherwise "not checked yet"
-- active status (a badge or label works fine)
+Use `useQuery` instead of `useEffect + useState`:
 
 ```tsx
-useEffect(() => {
-  getWatches().then(setWatches).catch(console.error)
-}, [])
-```
+import { useQuery } from "@tanstack/react-query"
+import { getWatches } from "@/api/watches"
+import FlightWatchCard from "./FlightWatchCard"
 
-**Checkpoint:** the list loads and shows all records from the database. Adding a new watch through the form and refreshing shows it in the list.
+export default function FlightWatchList() {
+  const { data: watches, isLoading, isError } = useQuery({
+    queryKey: ["watches"],
+    queryFn: getWatches,
+  })
 
----
+  if (isLoading) return <p className="text-muted-foreground">Loading watches...</p>
+  if (isError) return <p className="text-destructive">Failed to load watches.</p>
+  if (!watches?.length) return <p className="text-muted-foreground">No watches yet. Add one above.</p>
 
-## Phase 7 — Add edit capability
-
-For the MVP, the simplest approach is to reuse `FlightWatchForm` and pre-fill it with the existing record's values when editing.
-
-Alternatively, render a small inline form inside the card. Either approach works at this stage — pick the one that feels cleaner to you.
-
-When the user saves, call `updateWatch(id, changedFields)`. Then refresh the list.
-
-**Checkpoint:** changing the target price on an existing watch saves correctly and reflects in the list.
-
----
-
-## Phase 8 — Add delete
-
-Add a delete button to each watch card. On click, call `deleteWatch(id)` and remove the item from the list.
-
-A basic confirmation — even just `window.confirm` — is fine for now.
-
-```tsx
-const handleDelete = async (id: number) => {
-  if (!window.confirm("Remove this watch?")) return
-  await deleteWatch(id)
-  setWatches(prev => prev.filter(w => w.id !== id))
+  return (
+    <div className="grid gap-4">
+      {watches.map(watch => (
+        <FlightWatchCard key={watch.id} watch={watch} />
+      ))}
+    </div>
+  )
 }
 ```
 
-**Checkpoint:** deleting a watch removes it from the UI and from the database.
+**Checkpoint:** The list loads and shows all records from the database.
 
 ---
 
-## Phase 9 — UX improvements
+## Phase 11 — Build the watch card
 
-After the full CRUD flow works, these are worth adding before calling the frontend done:
+Create `src/components/FlightWatchCard.tsx` using shadcn/ui `Card` and `Badge`.
 
-- loading state while fetching (`isLoading` boolean in state)
-- empty state message when the list has no records
-- error message when a fetch or submit fails
-- reset the create form after a successful submit
-- disable the submit button while a request is in-flight
+Show at minimum:
+- origin → destination
+- departure date (and return date if present)
+- target price and currency
+- current price or "Not checked yet"
+- active status badge
+- delete button
 
-None of these require a library. Keep it simple.
-
-**Checkpoint:** the app feels predictable and gives feedback when something is happening.
+**Checkpoint:** Each watch displays all key fields, delete removes it from the list.
 
 ---
 
-## Phase 10 — Structure for later features
+## Phase 12 — Build the create form with React Hook Form
 
-Before moving on to background jobs and notifications, make sure the frontend structure won't block future additions:
+Create `src/components/FlightWatchForm.tsx`.
+
+Use `useForm` with the Zod resolver and `useMutation` to submit:
+
+```tsx
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { createWatch } from "@/api/watches"
+import { createWatchSchema, CreateWatchFormValues } from "@/lib/schemas"
+
+export default function FlightWatchForm() {
+  const queryClient = useQueryClient()
+
+  const form = useForm<CreateWatchFormValues>({
+    resolver: zodResolver(createWatchSchema),
+    defaultValues: {
+      origin: "",
+      destination: "",
+      departure_date: "",
+      return_date: null,
+      is_round_trip: false,
+      target_price: 0,
+      currency: "SEK",
+      is_active: true,
+    },
+  })
+
+  const mutation = useMutation({
+    mutationFn: createWatch,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["watches"] })
+      form.reset()
+    },
+  })
+
+  const onSubmit = (values: CreateWatchFormValues) => {
+    mutation.mutate(values)
+  }
+
+  // render form using shadcn/ui Input, Label, Button, etc.
+}
+```
+
+`invalidateQueries` tells TanStack Query to refetch the list after a successful create — no manual state management needed.
+
+**Checkpoint:** Submitting the form creates a record and the list refreshes automatically.
+
+---
+
+## Phase 13 — Add edit capability
+
+For edit, use `useMutation` with `updateWatch` and pre-fill the form with the existing record's values.
+
+The simplest approach: a dialog (shadcn/ui `Dialog`) triggered from the card, with `FlightWatchForm` pre-filled.
+
+**Checkpoint:** Changing the target price saves correctly and the card reflects the update.
+
+---
+
+## Phase 14 — Wire up delete
+
+In `FlightWatchCard`, use `useMutation` with `deleteWatch`:
+
+```tsx
+const deleteMutation = useMutation({
+  mutationFn: deleteWatch,
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["watches"] })
+  },
+})
+```
+
+**Checkpoint:** Deleting a watch removes it from the UI and from the database.
+
+---
+
+## Phase 15 — Structure for later features
+
+Before moving to background jobs and notifications:
 
 - the `api/` layer should be easy to extend with new endpoints
-- the `types/` file should be easy to expand with `PriceHistory` and `Notification` interfaces when needed
-- the component structure should support adding a price history chart per watch later
-
-Don't build those things now. Just don't build in a way that makes them painful to add.
+- the `types/` file should be easy to expand with `PriceHistory` and `Notification` interfaces
+- TanStack Query keys should be centralised so refetching is easy to coordinate
+- component structure should support adding a price history chart per watch later
 
 ---
 
 ## MVP complete when
 
-- the app starts
+- the app starts without errors
 - the create form submits and the record appears in the list
 - editing a watch updates it correctly
 - deleting a watch removes it
@@ -318,8 +499,7 @@ Don't build those things now. Just don't build in a way that makes them painful 
 - React Router / multi-page navigation
 - authentication screens
 - charts and analytics
-- global state management (Redux, Zustand) — component state is enough for now
-- Tailwind — plain CSS or inline styles are fine until the core works
+- global state management (Redux, Zustand) — TanStack Query covers server state
 - optimistic UI updates
 
 ---
@@ -328,11 +508,14 @@ Don't build those things now. Just don't build in a way that makes them painful 
 
 ```
 chore: initialize frontend app with Vite and React TS
+chore: add Tailwind CSS
+chore: configure path alias and shadcn/ui
+feat: add TanStack Query and React Hook Form setup
 chore: clean starter boilerplate
-feat: add flight watch TypeScript types
+feat: add flight watch TypeScript types and Zod schemas
 feat: add watch API module
-feat: add create watch form
-feat: add watch list with fetch on mount
+feat: add watch list with TanStack Query
+feat: add watch card component
+feat: add create watch form with React Hook Form
 feat: add edit and delete for watches
-feat: add loading, error, and empty states
 ```

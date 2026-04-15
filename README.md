@@ -46,7 +46,10 @@ Coming later:
 - React 18
 - TypeScript
 - Vite
-- Fetch API (no extra HTTP library for now)
+- Tailwind CSS
+- shadcn/ui (Radix UI + Tailwind component library)
+- TanStack Query (server state and data fetching)
+- React Hook Form + Zod (form handling and validation)
 
 **Database**
 - PostgreSQL
@@ -59,7 +62,6 @@ Coming later:
 FareTracker-FullStack/
 ├── README.md
 ├── .gitignore
-├── .gitattributes
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py
@@ -70,15 +72,40 @@ FareTracker-FullStack/
 │   │   ├── schemas.py           ✓ create / update / response
 │   │   ├── main.py              ✓ app entry point, /docs live
 │   │   ├── routes/
-│   │   │   └── watches.py       ← CRUD endpoints (in progress)
+│   │   │   └── watches.py       ✓ CRUD endpoints
 │   │   └── services/
+│   │       └── watches.py       ✓ DB logic
 │   ├── sql/
 │   │   ├── 001_create_flight_watches.sql  ✓
 │   │   └── 002_seed_flight_watches.sql    ✓
 │   ├── tests/
+│   │   └── test_watches.py      ✓ 12 pytest tests
 │   ├── requirements.txt         ✓
 │   └── .env.example             ✓
-├── frontend/                    (not started)
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── watches.ts       ✓ all API calls
+│   │   ├── components/
+│   │   │   ├── ui/              ✓ shadcn/ui components
+│   │   │   ├── FlightWatchForm.tsx       ✓ create form
+│   │   │   ├── FlightWatchList.tsx       ✓ watch list
+│   │   │   ├── FlightWatchCard.tsx       ✓ card with edit/delete
+│   │   │   └── FlightWatchEditDialog.tsx ✓ edit dialog
+│   │   ├── pages/
+│   │   │   └── HomePage.tsx     ✓ main page
+│   │   ├── types/
+│   │   │   └── flight-watch.ts  ✓ TypeScript interfaces
+│   │   ├── lib/
+│   │   │   ├── utils.ts         ✓ shadcn cn helper
+│   │   │   └── schemas.ts       ✓ Zod validation schemas
+│   │   ├── App.tsx              ✓
+│   │   ├── main.tsx             ✓ QueryClientProvider
+│   │   └── index.css            ✓ Tailwind + shadcn theme
+│   ├── components.json          ✓ shadcn/ui config
+│   ├── vite.config.ts           ✓
+│   ├── tsconfig.app.json        ✓
+│   └── .env.example             ✓
 └── docs/
     ├── backend-instruction.md
     ├── frontend-instruction.md
@@ -121,11 +148,11 @@ psql -U postgres -d fare_tracker -f backend/sql/002_seed_flight_watches.sql
 ```bash
 cd frontend
 npm install
-cp .env.example .env
+cp .env.example .env   # default points to http://localhost:8000
 npm run dev
 ```
 
-The app will be at `http://localhost:5173`.
+The app will be at `http://localhost:5173`. Make sure the backend is running first.
 
 ---
 
@@ -138,11 +165,11 @@ The project is built in phases rather than all at once. Each phase produces some
 | 1 | Repo structure | Done |
 | 2 | Database design and setup | Done |
 | 3 | Backend config and DB connection | Done |
-| 4 | CRUD endpoints | In progress |
-| 5 | Manual API testing | Pending |
-| 6 | Frontend scaffold | Pending |
-| 7 | UI for create and list | Pending |
-| 8 | Full frontend-backend wiring | Pending |
+| 4 | CRUD endpoints | Done |
+| 5 | Manual API testing | Done |
+| 6 | Frontend scaffold + tooling | Done |
+| 7 | UI for create, list, edit, delete | Done |
+| 8 | Full frontend-backend wiring | Done |
 | 9 | Price history support | Pending |
 | 10 | Background checks and notifications | Pending |
 
