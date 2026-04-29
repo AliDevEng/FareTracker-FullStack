@@ -382,6 +382,191 @@ What to skip for now:
 
 ---
 
+## Phase 11 — Add price history persistence
+
+The next backend feature should start in the database, not the routes.
+
+Create a new SQL script: `backend/sql/003_create_price_history.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS price_history (
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    flight_watch_id  INTEGER NOT NULL REFERENCES flight_watches(id) ON DELETE CASCADE,
+    price            NUMERIC(10,2) NOT NULL CHECK (price > 0),
+    currency         VARCHAR(10) NOT NULL,
+    checked_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    source_name      VARCHAR(100) NULL
+);
+```
+
+Then add:
+- a `PriceHistory` ORM model in `app/models.py`
+- response schemas in `app/schemas.py`
+- a small service module or helper functions for writing and reading history rows
+
+Do not add chart endpoints yet. The backend goal here is just to persist historical checks cleanly.
+
+**Checkpoint:** you can insert a price history row for a watch and fetch it back through SQLAlchemy.
+
+---
+
+## Phase 12 — Introduce a price-checking provider layer
+
+Before wiring in a real API, create a provider abstraction so the rest of the backend doesn't care where prices come from.
+
+Suggested structure:
+
+```
+app/
+├── providers/
+│   ├── __init__.py
+│   └── flights.py
+└── services/
+    ├── watches.py
+    └── price_checks.py
+```
+
+In `providers/flights.py`, define one simple interface:
+
+```python
+from decimal import Decimal
+from typing import TypedDict
+
+class PriceCheckResult(TypedDict):
+    price: Decimal
+    currency: str
+    source_name: str
+
+def get_latest_price(origin: str, destination: str, departure_date, return_date=None) -> PriceCheckResult:
+    ...
+```
+
+Start with a fake implementation if needed. The important thing is separating:
+- provider call
+- watch update logic
+- history write logic
+
+**Checkpoint:** one service function can fetch a price from the provider and return normalized data without touching the route layer.
+
+---
+
+## Phase 13 — Add a "check price now" backend flow
+
+Once the provider layer exists, add a service that performs a full price check for one watch:
+
+1. load the watch
+2. fetch the latest price from the provider
+3. update `flight_watches.current_price`
+4. insert a `price_history` row
+5. return the updated watch plus check metadata
+
+Expose that through a dedicated endpoint instead of overloading PATCH:
+
+```python
+POST /watches/{watch_id}/check-price
+```
+
+This should be an action endpoint, not a generic update endpoint, because it represents a backend operation with side effects.
+
+Keep route handlers thin:
+- route validates the request
+- service performs the workflow
+- route maps missing watches to `404`
+
+**Checkpoint:** calling the endpoint updates `current_price` and creates one matching `price_history` record.
+
+---
+
+## Phase 14 — Expose history endpoints
+
+Once price checks are stored, make the data available to the frontend.
+
+Suggested endpoints:
+
+```python
+GET /watches/{watch_id}/history
+GET /watches/{watch_id}/history?limit=30
+```
+
+Response shape should be simple:
+- watch id
+- list of historical price points ordered by `checked_at`
+
+Good defaults:
+- newest first in the database query
+- reverse in the response only if the frontend chart wants oldest first
+- optional `limit` so the endpoint stays lightweight
+
+This is enough for charting later without committing to a chart library now.
+
+**Checkpoint:** the frontend can request one watch's price history and receive a clean JSON list.
+
+---
+
+## Phase 15 — Background scheduler for active watches
+
+Manual checks are useful for development. The real feature is automated checks.
+
+Add a scheduler layer that:
+- runs on an interval
+- loads all `is_active = TRUE` watches
+- skips watches that already departed
+- calls the price-check service for each watch
+- logs failures without crashing the whole run
+
+Keep this logic out of FastAPI route handlers. A separate module such as `app/jobs/price_monitor.py` is a better fit.
+
+Use a lightweight scheduler first. APScheduler is a reasonable option once you're ready to install it.
+
+Important design rule:
+- the scheduler should call the same service function as `POST /watches/{watch_id}/check-price`
+
+That way there is one source of truth for price-check behavior.
+
+**Checkpoint:** one scheduled run can process all active watches and persist results without manual API calls.
+
+---
+
+## Phase 16 — Notification pipeline
+
+After scheduled checks work, add alerts when a price drops to or below the user's target.
+
+This is where the `notifications` table planned in `database-instruction.md` becomes real.
+
+Add:
+- `backend/sql/004_create_notifications.sql`
+- a `Notification` ORM model
+- a notification service that records send attempts
+- a delivery adapter per channel (email first, Telegram later if wanted)
+
+The alert rule should live in the service layer:
+
+```text
+if current_price <= target_price and watch is active:
+    create and send notification
+```
+
+Do not send alerts directly from route handlers. Notifications should happen as a consequence of the price-check workflow.
+
+Also decide early whether repeated alerts are allowed:
+- alert every qualifying check
+- or only alert the first time a watch crosses below target
+
+Both are valid, but the project should choose intentionally.
+
+**Checkpoint:** a qualifying price check creates a notification record and sends one real or mocked alert.
+
+---
+
+## Next backend milestone complete when
+
+- price history is stored in its own table
+- one watch can be checked on demand through the API
+- active watches can be processed automatically on a schedule
+- target-price alerts are persisted and delivered through at least one channel
+
+---
+
 ## MVP complete when
 
 - FastAPI starts without errors
