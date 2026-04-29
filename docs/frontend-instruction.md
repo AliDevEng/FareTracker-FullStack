@@ -483,6 +483,164 @@ Before moving to background jobs and notifications:
 
 ---
 
+## Phase 16 — Add query key and API structure for growth
+
+The frontend already has working CRUD. The next step is making state management easier to extend before more features arrive.
+
+Add a small query key module:
+
+```ts
+// src/lib/query-keys.ts
+export const queryKeys = {
+  watches: ['watches'] as const,
+  watchHistory: (watchId: number) => ['watches', watchId, 'history'] as const,
+}
+```
+
+Then clean up the API layer:
+- keep `src/api/watches.ts` focused on watch CRUD and watch-specific actions
+- add future API functions in predictable files instead of one giant module
+- standardise error handling so components don't invent their own strings everywhere
+
+This is a small refactor, but it pays off once history, manual checks, and notifications are added.
+
+**Checkpoint:** all components use shared query keys, and invalidation stays consistent across create, edit, delete, and toggle actions.
+
+---
+
+## Phase 17 — Add manual "check price now" UI
+
+When the backend exposes `POST /watches/{watch_id}/check-price`, the frontend should support it directly from each card.
+
+Add in `src/api/watches.ts`:
+
+```ts
+export async function checkWatchPrice(id: number) {
+  const res = await fetch(`${BASE_URL}/watches/${id}/check-price`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to check price')
+  return res.json()
+}
+```
+
+Then in `FlightWatchCard.tsx`:
+- add a `Check now` button
+- use `useMutation`
+- disable the button while the request is running
+- invalidate the watch list and history queries on success
+
+This lets users trigger one immediate price refresh instead of waiting for a scheduled backend check later.
+
+**Checkpoint:** clicking `Check now` updates the card's current price and any price delta badges after the mutation succeeds.
+
+---
+
+## Phase 18 — Add per-watch price history UI
+
+Once the backend exposes history endpoints, the next frontend phase is surfacing that data clearly.
+
+Start with types:
+
+```ts
+export interface PriceHistoryPoint {
+  id: number
+  flight_watch_id: number
+  price: number
+  currency: string
+  checked_at: string
+  source_name: string | null
+}
+```
+
+Then add:
+- `getWatchHistory(watchId: number, limit?: number)` in the API layer
+- a query per watch using a dedicated history key
+- a compact expandable section or dialog attached to each card
+
+Do not overbuild the visualization at first. A readable list of timestamps and prices is enough before adding charts.
+
+**Checkpoint:** opening a watch's history shows recent price points from the backend without affecting the rest of the page.
+
+---
+
+## Phase 19 — Add charting for price trends
+
+After the raw history list works, make it visual.
+
+Keep the first version simple:
+- one lightweight chart component
+- one line per watch
+- x-axis = `checked_at`
+- y-axis = `price`
+
+Good placement options:
+- inline expand area below a card
+- dialog opened from the card
+
+Important UX details:
+- show a loading state for the chart
+- show an empty state if there is no history yet
+- format prices with the watch currency
+- avoid visual clutter on mobile
+
+The chart should help answer one question quickly: is the fare moving toward or away from the target?
+
+**Checkpoint:** a user can open a watch and instantly understand the recent price trend visually.
+
+---
+
+## Phase 20 — Improve filtering and sorting
+
+Once users track more than a few routes, the list needs controls.
+
+Add lightweight filters above `FlightWatchList`:
+- active vs paused
+- currency
+- departure date ordering
+- price status such as `below target`, `above target`, `not checked`
+
+Keep this as UI state local to the page unless a clear reason appears to persist it.
+
+This should work on top of TanStack Query data already in memory. No new backend endpoint is needed for the first version.
+
+**Checkpoint:** a user with many watches can quickly narrow the list to the routes that matter right now.
+
+---
+
+## Phase 21 — Notification and status surfaces
+
+When the backend starts sending alerts, the frontend should expose that state in a helpful but lightweight way.
+
+Examples:
+- last checked timestamp on each card
+- last alert sent indicator
+- small badge when a watch is currently under target
+- optional notification preferences section later
+
+This is also a good point to add richer status messaging:
+- `checking now`
+- `price dropped`
+- `paused`
+- `not yet checked`
+- `backend unavailable`
+
+These states help the app feel alive once background checks start running.
+
+**Checkpoint:** a user can tell whether a watch has been checked recently and whether it has already triggered an alert.
+
+---
+
+## Next frontend milestone complete when
+
+- query keys and API modules are organized for growth
+- users can trigger a manual price check from the UI
+- each watch can show its own price history
+- price history can be visualized as a trend
+- the list is easier to scan with filtering and clearer status states
+
+---
+
 ## MVP complete when
 
 - the app starts without errors
