@@ -5,6 +5,12 @@ from typing import Optional
 from pydantic import BaseModel, field_validator
 
 
+def _validate_positive_price(value: Decimal, field_name: str) -> Decimal:
+    if value <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return value
+
+
 class FlightWatchCreate(BaseModel):
     origin: str
     destination: str
@@ -18,9 +24,7 @@ class FlightWatchCreate(BaseModel):
     @field_validator("target_price")
     @classmethod
     def target_price_must_be_positive(cls, v: Decimal) -> Decimal:
-        if v <= 0:
-            raise ValueError("target_price must be greater than 0")
-        return v
+        return _validate_positive_price(v, "target_price")
 
 
 class FlightWatchUpdate(BaseModel):
@@ -54,5 +58,28 @@ class FlightWatchResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PriceHistoryCreate(BaseModel):
+    flight_watch_id: int
+    price: Decimal
+    currency: str
+    source_name: Optional[str] = None
+
+    @field_validator("price")
+    @classmethod
+    def price_must_be_positive(cls, v: Decimal) -> Decimal:
+        return _validate_positive_price(v, "price")
+
+
+class PriceHistoryResponse(BaseModel):
+    id: int
+    flight_watch_id: int
+    price: Decimal
+    currency: str
+    checked_at: datetime
+    source_name: Optional[str]
 
     model_config = {"from_attributes": True}

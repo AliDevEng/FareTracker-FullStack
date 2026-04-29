@@ -131,7 +131,7 @@ export default function FlightWatchEditDialog({ watch, open, onOpenChange }: Pro
                 id="edit-price"
                 type="number"
                 min={1}
-                {...register('target_price')}
+                {...register('target_price', { valueAsNumber: true })}
               />
               {errors.target_price && <p className="text-destructive text-xs">{errors.target_price.message}</p>}
             </div>

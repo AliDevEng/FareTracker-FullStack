@@ -6,7 +6,7 @@ export const createWatchSchema = z.object({
   departure_date: z.string().min(1, "Departure date is required"),
   return_date: z.string().nullable().optional(),
   is_round_trip: z.boolean(),
-  target_price: z.coerce.number().positive("Price must be greater than 0"),
+  target_price: z.number().positive("Price must be greater than 0"),
   currency: z.string().min(1),
   is_active: z.boolean(),
 })

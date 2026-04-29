@@ -118,7 +118,7 @@ export default function FlightWatchForm() {
             type="number"
             min={1}
             placeholder="2500"
-            {...register('target_price')}
+            {...register('target_price', { valueAsNumber: true })}
           />
           {errors.target_price && <p className="text-destructive text-xs">{errors.target_price.message}</p>}
         </div>
